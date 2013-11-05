@@ -17,10 +17,6 @@ scalacOptions ++= Seq(
 
 sbtPlugin := true
 
-publishTo := {
-  import Classpaths._
-  val repo = if (isSnapshot.value) sbtPluginSnapshots else sbtPluginReleases
-  Some(repo)
-}
+publishTo <<= isSnapshot(if(_) Some("Openmole Nexus" at "http://maven.openmole.org/snapshots") else Some("Openmole Nexus" at "http://maven.openmole.org/releases"))
 
 publishMavenStyle := false
