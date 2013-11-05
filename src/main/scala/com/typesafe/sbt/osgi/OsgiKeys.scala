@@ -27,6 +27,8 @@ object OsgiKeys {
       "Create an OSGi bundle."
     )
 
+  val includeResource: SettingKey[Seq[String]] = SettingKey[Seq[String]]("include-resources")
+
   val manifestHeaders: SettingKey[OsgiManifestHeaders] =
     SettingKey[OsgiManifestHeaders](
       prefix("manifest-headers"),

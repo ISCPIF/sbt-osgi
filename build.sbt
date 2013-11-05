@@ -1,8 +1,8 @@
-organization := "com.typesafe.sbt"
+organization := "fr.iscpif"
 
 name := "sbt-osgi"
 
-version := "0.7.0-SNAPSHOT"
+version := "0.5.2"
 
 libraryDependencies ++= Dependencies.sbtOsgi
 
@@ -19,4 +19,6 @@ sbtPlugin := true
 
 publishTo <<= isSnapshot(if(_) Some("Openmole Nexus" at "http://maven.openmole.org/snapshots") else Some("Openmole Nexus" at "http://maven.openmole.org/releases"))
 
-publishMavenStyle := false
+credentials += Credentials(Path.userHome / ".sbt" / "openmole.credentials")
+
+publishMavenStyle := true

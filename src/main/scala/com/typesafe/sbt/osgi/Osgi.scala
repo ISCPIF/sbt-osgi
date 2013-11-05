@@ -16,34 +16,48 @@
 
 package com.typesafe.sbt.osgi
 
-import aQute.bnd.osgi.Builder
-import aQute.bnd.osgi.Constants._
+import aQute.lib.osgi.Builder
+import aQute.lib.osgi.Constants._
 import java.util.Properties
 import sbt._
 import sbt.Keys._
+import resource._
+import java.io.{ FileOutputStream, FileInputStream }
 
 private object Osgi {
-
   def bundleTask(
     headers: OsgiManifestHeaders,
+    resources: Seq[String],
     additionalHeaders: Map[String, String],
     fullClasspath: Seq[Attributed[File]],
     artifactPath: File,
     resourceDirectories: Seq[File],
-    embeddedJars: Seq[File]): File = {
-    val builder = new Builder
-    builder.setClasspath(fullClasspath map (_.data) toArray)
-    builder.setProperties(headersToProperties(headers, additionalHeaders))
-    //builder.setProperty(aQute.lib.osgi.Constants.INCLUDE_RESOURCE, "")
-    includeResourceProperty(resourceDirectories, embeddedJars) foreach (dirs =>
-      builder.setProperty(INCLUDE_RESOURCE, dirs)
-    )
-    bundleClasspathProperty(embeddedJars) foreach (jars =>
-      builder.setProperty(BUNDLE_CLASSPATH, jars)
-    )
-    val jar = builder.build
-    jar.write(artifactPath)
-    artifactPath
+    embeddedJars: Seq[File], target: File): File = {
+    val manifest = target / "manifest.xml"
+    val props = headersToProperties(headers, additionalHeaders)
+    val oldProps = new Properties()
+    if (manifest.exists) managed(new FileInputStream(manifest)) foreach oldProps.load
+    if (!oldProps.equals(props)) managed(new FileOutputStream(manifest)) foreach (props.store(_, ""))
+
+    def expand(f: File): Array[File] = if (f.isDirectory) f.listFiles() flatMap expand else Array(f)
+
+    val fun = FileFunction.cached(target / "package-cache", FilesInfo.lastModified, FilesInfo.exists) {
+      (changes: Set[File]) ⇒
+        val builder = new Builder
+        builder.setClasspath(fullClasspath map (_.data) toArray)
+        builder.setProperties(props)
+        includeResourceProperty(resourceDirectories, embeddedJars, resources) foreach (dirs ⇒
+          builder.setProperty(INCLUDERESOURCE, dirs)
+        )
+        bundleClasspathProperty(embeddedJars) foreach (jars ⇒
+          builder.setProperty(BUNDLE_CLASSPATH, jars)
+        )
+        val jar = builder.build
+        jar.write(artifactPath)
+        Set(artifactPath)
+    }
+
+    fun((fullClasspath flatMap (a ⇒ expand(a.data)) toSet) ++ (resourceDirectories flatMap expand).toSet ++ embeddedJars.toSet + manifest).headOption getOrElse target
   }
 
   def headersToProperties(headers: OsgiManifestHeaders, additionalHeaders: Map[String, String]): Properties = {
@@ -58,15 +72,16 @@ private object Osgi {
     fragmentHost foreach (properties.put(FRAGMENT_HOST, _))
     seqToStrOpt(privatePackage)(id) foreach (properties.put(PRIVATE_PACKAGE, _))
     seqToStrOpt(requireBundle)(id) foreach (properties.put(REQUIRE_BUNDLE, _))
-    additionalHeaders foreach { case (k, v) => properties.put(k, v) }
+    additionalHeaders foreach { case (k, v) ⇒ properties.put(k, v) }
     properties
   }
 
-  def seqToStrOpt[A](seq: Seq[A])(f: A => String): Option[String] =
+  def seqToStrOpt[A](seq: Seq[A])(f: A ⇒ String): Option[String] =
     if (seq.isEmpty) None else Some(seq map f mkString ",")
 
-  def includeResourceProperty(resourceDirectories: Seq[File], embeddedJars: Seq[File]) =
-    seqToStrOpt(resourceDirectories ++ embeddedJars)(_.getAbsolutePath)
+  def includeResourceProperty(resourceDirectories: Seq[File], embeddedJars: Seq[File], oResources: Seq[String]): Option[String] = {
+    seqToStrOpt(resourceDirectories ++ embeddedJars)(_.getAbsolutePath) zip seqToStrOpt(oResources)(a ⇒ a) map { case (a, b) ⇒ a + (if (!b.isEmpty) "," else "") + b } headOption
+  }
 
   def bundleClasspathProperty(embeddedJars: Seq[File]) =
     seqToStrOpt(embeddedJars)(_.getName) map (".," + _)
@@ -75,8 +90,8 @@ private object Osgi {
     val organizationParts = parts(organization)
     val nameParts = parts(name)
     val partsWithoutOverlap = (organizationParts.lastOption, nameParts.headOption) match {
-      case (Some(last), Some(head)) if (last == head) => organizationParts ++ nameParts.tail
-      case _ => organizationParts ++ nameParts
+      case (Some(last), Some(head)) if (last == head) ⇒ organizationParts ++ nameParts.tail
+      case _ ⇒ organizationParts ++ nameParts
     }
     partsWithoutOverlap mkString "."
   }
