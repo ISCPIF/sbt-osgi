@@ -47,7 +47,7 @@ private object Osgi {
         builder.setClasspath(fullClasspath map (_.data) toArray)
         builder.setProperties(props)
         includeResourceProperty(resourceDirectories, embeddedJars, resources) foreach (dirs ⇒
-          builder.setProperty(INCLUDERESOURCE, dirs)
+          builder.setProperty(INCLUDE_RESOURCE, dirs)
         )
         bundleClasspathProperty(embeddedJars) foreach (jars ⇒
           builder.setProperty(BUNDLE_CLASSPATH, jars)
@@ -80,7 +80,7 @@ private object Osgi {
     if (seq.isEmpty) None else Some(seq map f mkString ",")
 
   def includeResourceProperty(resourceDirectories: Seq[File], embeddedJars: Seq[File], oResources: Seq[String]): Option[String] = {
-    seqToStrOpt(resourceDirectories ++ embeddedJars)(_.getAbsolutePath) zip seqToStrOpt(oResources)(a ⇒ a) map { case (a, b) ⇒ a + (if (!b.isEmpty) "," else "") + b } headOption
+    seqToStrOpt(resourceDirectories ++ embeddedJars)(_.getAbsolutePath)
   }
 
   def bundleClasspathProperty(embeddedJars: Seq[File]) =
